@@ -1,0 +1,58 @@
+pragma solidity ^0.8.0;
+
+contract OpenEditionNFT {
+    mapping(address => mapping(uint256 => bool)) private _tokenOwnership;
+    mapping(uint256 => address) private _tokenOwner;
+    mapping(uint256 => uint256) private _tokenPrice;
+    mapping(uint256 => uint256) private _tokenTimestamp;
+    address public minter;
+    event Mint(address minter, address to, uint256 tokenId);
+    event Transfer(address from, address to, uint256 tokenId);
+    event Burn(address burner, uint256 tokenId);
+    event PriceChange(uint256 tokenId, uint256 newPrice);
+   
+    constructor() public {
+        minter = msg.sender;
+    }
+    
+    function mint(address to, uint256 tokenId, uint256 price) public {
+        require(msg.sender == minter, "Only minter can mint new tokens.");
+        require(price > 0, "Price must be greater than 0.");
+        _tokenOwnership[to][tokenId] = true;
+        _tokenOwner[tokenId] = to;
+        _tokenPrice[tokenId] = price;
+        _tokenTimestamp[tokenId] = now;
+        emit Mint(msg.sender, to, tokenId);
+    }
+
+    function transfer(address to, uint256 tokenId) public {
+        require(_tokenOwnership[msg.sender][tokenId], "Sender does not own the token.");
+        _tokenOwnership[msg.sender][tokenId] = false;
+        _tokenOwnership[to][tokenId] = true;
+        _tokenOwner[tokenId] = to;
+        emit Transfer(msg.sender, to, tokenId);
+    }
+
+    function burn(uint256 tokenId) public {
+        require(_tokenOwnership[msg.sender][tokenId], "Sender does not own the token.");
+        _tokenOwnership[msg.sender][tokenId] = false;
+        delete _tokenOwner[tokenId];
+        delete _tokenPrice[tokenId];
+        delete _tokenTimestamp[tokenId];
+        emit Burn(msg.sender, tokenId);
+    }
+
+    function updatePrice(uint256 tokenId, uint256 newPrice) public {
+        require(_tokenOwnership[msg.sender][tokenId], "Sender does not own the token.");
+        require(newPrice > 0, "Price must be greater than 0.");
+        _tokenPrice[tokenId] = newPrice;
+        _tokenTimestamp[tokenId] = now;
+        emit PriceChange(tokenId, newPrice);
+    }
+
+    function burnIfLowestPrice(uint256 tokenId, uint256 currentLowestPrice) public {
+        require(_tokenOwnership[msg.sender][tokenId], "Sender does not own the token.");
+        require(currentLowestPrice > 0, "Current lowest price must be greater than 0.");
+
+        if (_tokenPrice[tokenId] <= currentLowestPrice) {
+            if (now >= _tokenTimestamp[
